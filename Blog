@@ -1,0 +1,72 @@
+AIR GUARD: Giải quyết bài toán thiếu nhãn trong dự báo chất lượng không khí bằng Semi-Supervised Learning
+NHóm 11
+Môn học: Data Mining (Khai phá dữ liệu)
+Dataset: Beijing Multi-Site Air-Quality Data (PRSA2017)
+1. Giới thiệu (Introduction)
+1.1. Vấn đề thực tế
+Ô nhiễm không khí, đặc biệt là nồng độ bụi mịn PM2.5, đang trở thành một trong những thách thức môi trường nghiêm trọng nhất tại các đô thị lớn. Việc xây dựng các hệ thống dự báo và cảnh báo sớm chất lượng không khí đóng vai trò quan trọng trong bảo vệ sức khỏe cộng đồng.
+Tuy nhiên, các mô hình học máy truyền thống (Supervised Learning) đòi hỏi một lượng lớn dữ liệu được gán nhãn đầy đủ và liên tục. Trong thực tế, việc duy trì hệ thống cảm biến chuẩn hoặc gán nhãn thủ công cho dữ liệu môi trường là cực kỳ tốn kém và khó mở rộng, dẫn đến tình trạng thiếu hụt nghiêm trọng dữ liệu có nhãn (Label Scarcity).
+1.2. Mục tiêu dự án
+Dự án AIR GUARD đặt ra một kịch bản mang tính thực tiễn cao:
+Làm thế nào để xây dựng mô hình dự báo chất lượng không khí hiệu quả khi chỉ còn 5% dữ liệu có nhãn và 95% dữ liệu không có nhãn?
+Để giải quyết bài toán này, dự án áp dụng các kỹ thuật Học bán giám sát (Semi-Supervised Learning) nhằm tận dụng tối đa dữ liệu thô (Unlabeled Data), biến dữ liệu không nhãn thành tài nguyên huấn luyện có giá trị thông qua cơ chế gán nhãn giả (Pseudo-labeling).
+2. Kiến trúc hệ thống & Phương pháp (Methodology)
+Dự án được xây dựng dưới dạng một Pipeline tự động hóa, quản lý toàn bộ quy trình từ tiền xử lý dữ liệu, huấn luyện mô hình cho đến đánh giá và báo cáo kết quả. Pipeline được triển khai với sự hỗ trợ của thư viện Papermill, cho phép tái lập và mở rộng các thí nghiệm một cách nhất quán.
+2.1. Quy trình xử lý dữ liệu
+Dataset: Beijing Multi-Site Air-Quality Data (2013–2017).
+Feature Engineering:
+Tạo các đặc trưng độ trễ (Lag Features) như PM2.5_lag_1h, PM2.5_lag_24h nhằm khai thác tính phụ thuộc theo thời gian của dữ liệu chuỗi.
+Gán nhãn AQI:
+Chuyển đổi giá trị PM2.5 sang các mức chất lượng không khí theo chuẩn AQI: Good, Moderate, Unhealthy, Very Unhealthy,...
+Masking (Mô phỏng thiếu nhãn):
+Ẩn ngẫu nhiên 95% nhãn của tập huấn luyện để mô phỏng kịch bản thiếu nhãn trong thực tế.
+2.2. Các thuật toán được triển khai
+Trong dự án này, tôi tiến hành so sánh ba phương pháp tiếp cận chính:
+1. Supervised Baseline
+Huấn luyện mô hình Random Forest chỉ trên 5% dữ liệu có nhãn.
+Mô hình này đóng vai trò mốc tham chiếu (Benchmark) để đánh giá hiệu quả của các phương pháp bán giám sát.
+2. Self-Training (Tự huấn luyện)
+Sử dụng mô hình ban đầu để dự đoán nhãn cho tập dữ liệu chưa gán nhãn.
+Chỉ lựa chọn các mẫu có độ tin cậy cao (Confidence > τ) để gán nhãn giả (Pseudo-labels).
+Các mẫu này được bổ sung trở lại tập huấn luyện, và mô hình được huấn luyện lại theo từng vòng lặp.
+3. Co-Training (Đồng huấn luyện)
+Chia dữ liệu thành hai góc nhìn (Views) mang tính bổ trợ:
+View 1 – Hóa học: SO₂, NO₂, CO, O₃.
+View 2 – Khí tượng: Nhiệt độ, áp suất, lượng mưa, tốc độ gió.
+Hai mô hình được huấn luyện song song trên hai view này và trao đổi nhãn giả tự tin nhất cho nhau, từ đó cải thiện khả năng tổng quát hóa.
+4. ARIMA
+Được sử dụng cho bài toán dự báo chuỗi thời gian (Time-Series Forecasting) nhằm nắm bắt xu hướng và tính mùa vụ của PM2.5.
+3. Kết quả thực nghiệm (Experimental Results)
+3.1. So sánh độ chính xác (Accuracy)
+Kết quả đánh giá trên tập Test (dữ liệu năm 2017) cho thấy sự cải thiện rõ rệt khi áp dụng các phương pháp học bán giám sát
+Nhận xét:
+Supervised Baseline: Cho kết quả thấp nhất do mô hình bị Underfitting vì thiếu dữ liệu huấn luyện.
+Self-Training: Cải thiện đáng kể độ chính xác so với Baseline, chứng minh hiệu quả của việc khai thác dữ liệu không nhãn thông qua Pseudo-labeling.
+Co-Training: Đạt hiệu năng ổn định nhờ tận dụng sự đa dạng thông tin từ các tập đặc trưng đa góc nhìn (Multi-view Learning).
+3.2. Động lực học quá trình huấn luyện (Training Dynamics)
+Biểu đồ dưới đây thể hiện số lượng nhãn giả được mô hình gán qua từng vòng lặp Self-Training.
+(Chèn hình biểu đồ “Number of Pseudo-labels per Iteration”)
+Giai đoạn đầu: Mô hình nhanh chóng học được các mẫu dễ (Easy Examples), số lượng nhãn giả tăng mạnh.
+Giai đoạn sau: Quá trình gán nhãn dần bão hòa, mô hình tập trung tinh chỉnh ranh giới quyết định (Decision Boundaries) cho các mẫu khó hơn.
+3.3. Phân tích độ nhạy tham số (Sensitivity Analysis)
+Tôi tiến hành thử nghiệm với các ngưỡng tin cậy τ khác nhau trong Self-Training:
+Ngưỡng τ	Accuracy	Nhận xét
+0.90 (Cao)	Cao nhất	Mô hình thận trọng, chỉ học các mẫu rất chắc chắn → Nhiễu thấp
+0.75 (Trung bình)	Thấp hơn	Gán nhiều nhãn sai, gây lan truyền lỗi
+Kết luận: Ngưỡng tin cậy cao là yếu tố then chốt để ngăn chặn hiện tượng Error Propagation trong Self-Training.
+4. Sản phẩm: Dashboard AIR GUARD
+Để trực quan hóa kết quả cho người dùng cuối, tôi xây dựng ứng dụng Web bằng Streamlit.
+Các chức năng chính:
+Real-time Metrics: Theo dõi độ chính xác của mô hình.
+Forcast Visualization: Biểu đồ so sánh PM2.5 dự báo (ARIMA) và giá trị thực tế.
+Alert System: Cảnh báo các thời điểm ô nhiễm ở mức Unhealthy trở lên.
+5. Kết luận & Hướng phát triển
+Dự án AIR GUARD đã giải quyết hiệu quả bài toán thiếu nhãn trong dự báo chất lượng không khí.
+Thành quả chính:
+Xây dựng pipeline Machine Learning hoàn chỉnh.
+Chứng minh rằng Self-Training vượt trội hơn Supervised Baseline trong bối cảnh dữ liệu khan hiếm.
+Hạn chế:
+Hiệu quả của Co-Training phụ thuộc mạnh vào cách chia các View đặc trưng.
+Hướng phát triển:
+Áp dụng Dynamic Threshold (ví dụ: FlexMatch) để cải thiện khả năng học các lớp thiểu số như Very Unhealthy hoặc Hazardous.
+Kết hợp thêm các thuật toán bán giám sát khác như Label Propagation.
